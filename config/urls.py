@@ -45,5 +45,9 @@ urlpatterns = [
     path(
     "api/v1/",
     include("apps.routine.urls")
-    )
+    ),
+    path(
+    "api/v1/",
+    include("apps.attendance.urls")
+),
 ]
