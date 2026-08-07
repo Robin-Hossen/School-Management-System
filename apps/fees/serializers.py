@@ -1,0 +1,18 @@
+from rest_framework import serializers
+from .models import FeeStructure,StudentFee,Payment
+
+
+class FeeStructureSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = FeeStructure
+        fields = "__all__"
+
+class StudentFeeSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = StudentFee
+        fields = "__all__"
+
+class PaymentSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Payment
+        fields = "__all__"
