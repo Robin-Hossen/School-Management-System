@@ -1,5 +1,5 @@
 from rest_framework.routers import DefaultRouter
-from .views import AcademicSessionViewSet, ClassViewSet, SectionViewSet, SubjectViewSet,EnrollmentViewSet
+from .views import AcademicSessionViewSet, ClassViewSet, SectionViewSet, SubjectViewSet,EnrollmentViewSet, TeachingAssignmentViewSet
 
 router = DefaultRouter()
 router.register(r'academic-sessions', AcademicSessionViewSet, basename='academic-session')
@@ -7,5 +7,6 @@ router.register(r'classes', ClassViewSet, basename='class')
 router.register(r'subjects', SubjectViewSet, basename='subject')
 router.register(r'enrollments', EnrollmentViewSet, basename='enrollment')
 router.register(r'sections', SectionViewSet, basename='section')
+router.register(r'teaching-assignments', TeachingAssignmentViewSet, basename='teaching-assignment')
 urlpatterns = router.urls
 

@@ -1,7 +1,7 @@
 from django.shortcuts import render
 from rest_framework import viewsets
-from .models import AcademicSession,Class, Section,Subject,Enrollment
-from .serializers import AcademicSessionSerializer,ClassSerializer, EnrollmentSerializer,SubjectSerializer,SectionSerializer
+from .models import AcademicSession,Class, Section,Subject,Enrollment,TeachingAssignment
+from .serializers import AcademicSessionSerializer,ClassSerializer, EnrollmentSerializer,SubjectSerializer,SectionSerializer,TeachingAssignmentSerializer
 
 
 # Create your views here.
@@ -25,3 +25,7 @@ class SectionViewSet(viewsets.ModelViewSet):
 class EnrollmentViewSet(viewsets.ModelViewSet):
     queryset=Enrollment.objects.all()
     serializer_class=EnrollmentSerializer      
+
+class TeachingAssignmentViewSet(viewsets.ModelViewSet):
+    queryset=TeachingAssignment.objects.all()
+    serializer_class=TeachingAssignmentSerializer

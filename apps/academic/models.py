@@ -124,3 +124,61 @@ class Enrollment(models.Model):
 
     def __str__(self):
         return f"{self.student} - {self.academic_session}"    
+
+
+#TeacherAssignment model
+class TeachingAssignment(models.Model):
+    teacher = models.ForeignKey(
+        "teachers.Teacher",
+        on_delete=models.CASCADE,
+        related_name="teaching_assignments"
+    )
+
+    subject = models.ForeignKey(
+        Subject,
+        on_delete=models.CASCADE,
+        related_name="teaching_assignments"
+    )
+
+    class_name = models.ForeignKey(
+        Class,
+        on_delete=models.CASCADE,
+        related_name="teaching_assignments"
+    )
+
+    section = models.ForeignKey(
+        Section,
+        on_delete=models.CASCADE,
+        related_name="teaching_assignments"
+    )
+
+    academic_session = models.ForeignKey(
+        AcademicSession,
+        on_delete=models.CASCADE,
+        related_name="teaching_assignments"
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=[
+                    "teacher",
+                    "subject",
+                    "class_name",
+                    "section",
+                    "academic_session",
+                ],
+                name="unique_teaching_assignment"
+            )
+        ]
+
+    def __str__(self):
+        return (
+            f"{self.teacher.teacher_id} - "
+            f"{self.subject.name} - "
+            f"{self.class_name.name} - "
+            f"{self.section.name}"
+        )   
