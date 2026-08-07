@@ -2,9 +2,11 @@
 
 from pathlib import Path
 from decouple import config
+from datetime import timedelta
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+
 
 
 # Quick-start development settings - unsuitable for production
@@ -28,6 +30,8 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    "rest_framework",
+    'drf_spectacular',
     'apps.accounts',
 ]
 
@@ -130,3 +134,33 @@ MAILERS = {
 
 
 AUTH_USER_MODEL = "accounts.CustomUser"
+DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+#Additional settings for Django REST Framework and Simple JWT
+
+REST_FRAMEWORK = {
+    "DEFAULT_AUTHENTICATION_CLASSES": (
+        "rest_framework_simplejwt.authentication.JWTAuthentication",
+    ),
+    "DEFAULT_PERMISSION_CLASSES": (
+        "rest_framework.permissions.IsAuthenticated",
+    ),
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+}
+
+SIMPLE_JWT = {
+    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=30),
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
+    "ROTATE_REFRESH_TOKENS": True,
+    "BLACKLIST_AFTER_ROTATION": True,
+}
+# API Documentation Settings
+SPECTACULAR_SETTINGS = {
+    "TITLE": "School Management System API",
+    "DESCRIPTION": "School Management System Backend API",
+    "VERSION": "1.0.0",
+    "SERVE_INCLUDE_SCHEMA": False,
+
+    "COMPONENT_SPLIT_REQUEST": True,
+
+}
