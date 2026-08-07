@@ -17,4 +17,8 @@ class ProfileSerializers(serializers.ModelSerializer):
     class Meta:
         model=CustomUser
         fields=['id','email','first_name','last_name']    
-        
+        read_only_fields=['id','email'] #profile view te user email, first_name, last_name change korte parbe na, tai read_only_fields use korbo
+
+
+class LogoutSerializer(serializers.Serializer):
+    refresh= serializers.CharField(required=True)
