@@ -74,3 +74,39 @@ class AttendancePermission(BasePermission):
             UserRole.ADMIN,
             UserRole.TEACHER,
         )
+
+class ExamPermission(BasePermission):
+    def has_permission(self, request, view):
+        if not request.user.is_authenticated:
+            return False
+
+        # Everyone allowed to read
+        if request.method in ("GET", "HEAD", "OPTIONS"):
+            return request.user.role in (
+                UserRole.ADMIN,
+                UserRole.TEACHER,
+                UserRole.STUDENT,
+            )
+
+        # Only Admin can create/update/delete exams
+        return request.user.role == UserRole.ADMIN
+
+
+class ResultPermission(BasePermission):
+    def has_permission(self, request, view):
+        if not request.user.is_authenticated:
+            return False
+
+        # Everyone can read results
+        if request.method in ("GET", "HEAD", "OPTIONS"):
+            return request.user.role in (
+                UserRole.ADMIN,
+                UserRole.TEACHER,
+                UserRole.STUDENT,
+            )
+
+        # Admin and Teacher can create/update/delete
+        return request.user.role in (
+            UserRole.ADMIN,
+            UserRole.TEACHER,
+        )    
