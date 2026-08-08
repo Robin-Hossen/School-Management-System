@@ -110,3 +110,64 @@ class ResultPermission(BasePermission):
             UserRole.ADMIN,
             UserRole.TEACHER,
         )    
+
+
+
+class FeeStructurePermission(BasePermission):
+    def has_permission(self, request, view):
+        if not request.user.is_authenticated:
+            return False
+
+        # Everyone can view fee structures
+        if request.method in ("GET", "HEAD", "OPTIONS"):
+            return request.user.role in (
+                UserRole.ADMIN,
+                UserRole.ACCOUNTANT,
+                UserRole.STUDENT,
+            )
+
+        # Only Admin and Accountant can modify
+        return request.user.role in (
+            UserRole.ADMIN,
+            UserRole.ACCOUNTANT,
+        )
+
+
+class StudentFeePermission(BasePermission):
+    def has_permission(self, request, view):
+        if not request.user.is_authenticated:
+            return False
+
+        # Admin, Accountant and Student can view
+        if request.method in ("GET", "HEAD", "OPTIONS"):
+            return request.user.role in (
+                UserRole.ADMIN,
+                UserRole.ACCOUNTANT,
+                UserRole.STUDENT,
+            )
+
+        # Only Admin and Accountant can modify
+        return request.user.role in (
+            UserRole.ADMIN,
+            UserRole.ACCOUNTANT,
+        )
+
+
+class PaymentPermission(BasePermission):
+    def has_permission(self, request, view):
+        if not request.user.is_authenticated:
+            return False
+
+        # Admin, Accountant and Student can view
+        if request.method in ("GET", "HEAD", "OPTIONS"):
+            return request.user.role in (
+                UserRole.ADMIN,
+                UserRole.ACCOUNTANT,
+                UserRole.STUDENT,
+            )
+
+        # Only Admin and Accountant can create/update/delete
+        return request.user.role in (
+            UserRole.ADMIN,
+            UserRole.ACCOUNTANT,
+        )    
