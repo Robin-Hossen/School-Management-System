@@ -58,4 +58,8 @@ urlpatterns = [
     "api/v1/",
     include("apps.fees.urls")
     ),
+    path(
+    "api/v1/",
+    include("apps.notice.urls")
+    ),
 ]
