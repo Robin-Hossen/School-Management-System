@@ -62,4 +62,8 @@ urlpatterns = [
     "api/v1/",
     include("apps.notice.urls")
     ),
+    path(
+    "api/v1/",
+    include("apps.communication.urls")
+    ),
 ]
