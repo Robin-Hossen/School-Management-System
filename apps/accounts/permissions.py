@@ -171,3 +171,21 @@ class PaymentPermission(BasePermission):
             UserRole.ADMIN,
             UserRole.ACCOUNTANT,
         )    
+
+
+class NoticePermission(BasePermission):
+    def has_permission(self, request, view):
+        if not request.user.is_authenticated:
+            return False
+
+        # Everyone can read notices
+        if request.method in ("GET", "HEAD", "OPTIONS"):
+            return request.user.role in (
+                UserRole.ADMIN,
+                UserRole.TEACHER,
+                UserRole.STUDENT,
+                UserRole.ACCOUNTANT,
+            )
+
+        # Only Admin can create/update/delete
+        return request.user.role == UserRole.ADMIN    
