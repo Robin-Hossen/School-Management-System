@@ -189,3 +189,22 @@ class NoticePermission(BasePermission):
 
         # Only Admin can create/update/delete
         return request.user.role == UserRole.ADMIN    
+
+
+
+
+class MessagePermission(BasePermission):
+    def has_permission(self, request, view):
+        return request.user.is_authenticated
+
+    def has_object_permission(self, request, view, obj):
+        # Receiver can read
+        if request.method in ("GET", "HEAD", "OPTIONS"):
+            return (
+                obj.sender == request.user
+                or obj.receiver == request.user
+            )
+
+        # Only sender can modify/delete
+        return obj.sender == request.user
+    

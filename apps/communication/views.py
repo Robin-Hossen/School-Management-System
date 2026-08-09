@@ -1,27 +1,53 @@
-from rest_framework import viewsets
+from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework import filters, viewsets
+
+from apps.accounts.models import UserRole
+from apps.accounts.permissions import MessagePermission
+
+from .filters import MessageFilter
 from .models import Message
 from .serializers import MessageSerializer
 
 
 class MessageViewSet(viewsets.ModelViewSet):
     serializer_class = MessageSerializer
+    permission_classes = [MessagePermission]
+
+    filter_backends = [
+        DjangoFilterBackend,
+        filters.SearchFilter,
+        filters.OrderingFilter,
+    ]
+
+    filterset_class = MessageFilter
+
+    search_fields = [
+        "subject",
+        "content",
+    ]
+
+    ordering_fields = [
+        "created_at",
+        "updated_at",
+        "subject",
+    ]
+
+    ordering = ["-created_at"]
 
     def get_queryset(self):
-        queryset = Message.objects.all()
 
-        receiver = self.request.query_params.get("receiver")
-        sender = self.request.query_params.get("sender")
-        is_read = self.request.query_params.get("is_read")
+        if getattr(self, "swagger_fake_view", False):
+            return Message.objects.none()
 
-        if receiver:
-            queryset = queryset.filter(receiver_id=receiver)
+        user = self.request.user
 
-        if sender:
-            queryset = queryset.filter(sender_id=sender)
+        return Message.objects.filter(
+            sender=user
+        ) | Message.objects.filter(
+            receiver=user
+        )
 
-        if is_read is not None:
-            queryset = queryset.filter(
-                is_read=is_read.lower() == "true"
-            )
-
-        return queryset
+    def perform_create(self, serializer):
+        serializer.save(
+            sender=self.request.user
+        )
