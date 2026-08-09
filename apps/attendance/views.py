@@ -2,6 +2,7 @@ from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from django.db import transaction
 
 from apps.accounts.models import UserRole
 from apps.accounts.permissions import AttendancePermission
@@ -9,7 +10,7 @@ from apps.academic.models import Enrollment, TeachingAssignment
 
 from .filters import AttendanceFilter
 from .models import Attendance
-from .serializers import AttendanceSerializer
+from .serializers import AttendanceSerializer,TakeAttendanceSerializer
 from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiTypes
 
 
@@ -133,3 +134,147 @@ class AttendanceViewSet(viewsets.ModelViewSet):
         ]
 
         return Response(data)
+    @action(
+    detail=False,
+    methods=["post"],
+    url_path="take-attendance"
+    )
+    def take_attendance(self, request):
+
+        if request.user.role != UserRole.TEACHER:
+            return Response(
+                {
+                    "detail": "Only teachers can take attendance."
+                },
+                status=403
+            )
+
+        serializer = TakeAttendanceSerializer(
+            data=request.data
+        )
+
+        serializer.is_valid(raise_exception=True)
+
+        teaching_assignment_id = serializer.validated_data[
+            "teaching_assignment"
+        ]
+
+        attendance_date = serializer.validated_data[
+            "date"
+        ]
+
+        attendance_data = serializer.validated_data[
+            "attendance"
+        ]
+
+        # =========================
+        # Verify Teaching Assignment
+        # =========================
+
+        assignment = TeachingAssignment.objects.filter(
+            id=teaching_assignment_id,
+            teacher__user=request.user
+        ).first()
+
+        if not assignment:
+            return Response(
+                {
+                    "detail": "Teaching assignment not found."
+                },
+                status=404
+            )
+
+        # =========================
+        # Get Active Students
+        # =========================
+
+        enrollments = Enrollment.objects.filter(
+            academic_session=assignment.academic_session,
+            class_name=assignment.class_name,
+            section=assignment.section,
+            status=Enrollment.Status.ACTIVE
+        )
+
+        valid_student_ids = set(
+            enrollments.values_list(
+                "student_id",
+                flat=True
+            )
+        )
+
+        # =========================
+        # Validate Students
+        # =========================
+
+        for item in attendance_data:
+
+            student_id = item.get("student_id")
+            status = item.get("status")
+
+            if student_id not in valid_student_ids:
+                return Response(
+                    {
+                        "detail": (
+                            f"Student {student_id} "
+                            "does not belong to this class."
+                        )
+                    },
+                    status=400
+                )
+
+            if status not in [
+                "PRESENT",
+                "ABSENT",
+                "LATE",
+                "EXCUSED"
+            ]:
+                return Response(
+                    {
+                        "detail": (
+                            f"Invalid attendance status "
+                            f"for student {student_id}."
+                        )
+                    },
+                    status=400
+                )
+
+        # =========================
+        # Save Attendance
+        # =========================
+
+        created = []
+
+        with transaction.atomic():
+
+            for item in attendance_data:
+
+                student_id = item["student_id"]
+                status = item["status"]
+
+                enrollment = enrollments.get(
+                    student_id=student_id
+                )
+
+                attendance, created_new = Attendance.objects.update_or_create(
+                    student_id=student_id,
+                    enrollment=enrollment,
+                    teaching_assignment=assignment,
+                    date=attendance_date,
+                    defaults={
+                        "status": status
+                    }
+                )
+
+                created.append(attendance)
+
+            return Response(
+            {
+                "message": "Attendance saved successfully.",
+                "count": len(created),
+                "attendance": AttendanceSerializer(
+                    created,
+                    many=True
+                ).data
+            },
+            status=200
+        )

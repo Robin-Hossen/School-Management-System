@@ -12,3 +12,13 @@ class AttendanceStudentSerializer(serializers.Serializer):
     student_code = serializers.CharField()
     student_name = serializers.CharField()
     status = serializers.CharField()        
+
+class TakeAttendanceSerializer(serializers.Serializer):
+
+    teaching_assignment = serializers.IntegerField()
+
+    date = serializers.DateField()
+
+    attendance = serializers.ListField(
+        child=serializers.DictField()
+    )    
