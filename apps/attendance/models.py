@@ -29,8 +29,6 @@ class Attendance(models.Model):
         TeachingAssignment,
         on_delete=models.CASCADE,
         related_name="attendances",
-        null=True,
-        blank=True
     )
 
     date = models.DateField()
@@ -52,10 +50,14 @@ class Attendance(models.Model):
 
     class Meta:
         constraints = [
-            models.UniqueConstraint(
-                fields=["student", "enrollment", "date"],
-                name="unique_student_attendance_per_day"
-            )
+        models.UniqueConstraint(
+            fields=[
+                "student",
+                "teaching_assignment",
+                "date"
+            ],
+            name="unique_student_attendance_per_assignment_day"
+        )
         ]
 
     def __str__(self):
