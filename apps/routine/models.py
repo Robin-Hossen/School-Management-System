@@ -35,5 +35,18 @@ class Routine(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=[
+                    "teaching_assignment",
+                    "day",
+                    "start_time",
+                    "end_time",
+                ],
+                name="unique_routine_schedule"
+            )
+        ]
+
     def __str__(self):
         return f"{self.teaching_assignment} - {self.day}"

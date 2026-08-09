@@ -207,4 +207,22 @@ class MessagePermission(BasePermission):
 
         # Only sender can modify/delete
         return obj.sender == request.user
-    
+
+
+
+
+class RoutinePermission(BasePermission):
+    def has_permission(self, request, view):
+        if not request.user.is_authenticated:
+            return False
+
+        # Admin, Teacher and Student can view
+        if request.method in ("GET", "HEAD", "OPTIONS"):
+            return request.user.role in (
+                UserRole.ADMIN,
+                UserRole.TEACHER,
+                UserRole.STUDENT,
+            )
+
+        # Only Admin can create/update/delete
+        return request.user.role == UserRole.ADMIN

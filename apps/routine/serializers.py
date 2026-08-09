@@ -6,3 +6,7 @@ class RoutineSerializer(serializers.ModelSerializer):
     class Meta:
         model = Routine
         fields = "__all__"
+        read_only_fields = [
+            "created_at",
+            "updated_at",
+        ]
