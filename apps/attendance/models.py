@@ -1,6 +1,7 @@
 from django.db import models
 from apps.students.models import Student
-from apps.academic.models import Enrollment
+from apps.academic.models import Enrollment,TeachingAssignment
+
 
 
 class Attendance(models.Model):
@@ -22,6 +23,14 @@ class Attendance(models.Model):
         Enrollment,
         on_delete=models.CASCADE,
         related_name="attendances"
+    )
+
+    teaching_assignment = models.ForeignKey(
+        TeachingAssignment,
+        on_delete=models.CASCADE,
+        related_name="attendances",
+        null=True,
+        blank=True
     )
 
     date = models.DateField()
