@@ -84,5 +84,11 @@ urlpatterns = [
     ),
     path(
         "api/v1/dashboard/", 
-        include("apps.dashboard.urls")),
+        include("apps.dashboard.urls")
+        ),
+
+    path(
+    "api/v1/accounts/",
+    include("apps.accounts.urls")
+    ),    
 ]
