@@ -10,8 +10,13 @@ from apps.academic.models import Enrollment, TeachingAssignment
 
 from .filters import AttendanceFilter
 from .models import Attendance
-from .serializers import AttendanceSerializer,TakeAttendanceSerializer
-from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiTypes
+from .serializers import AttendanceSerializer, TakeAttendanceSerializer
+
+from drf_spectacular.utils import (
+    extend_schema,
+    OpenApiParameter,
+    OpenApiTypes,
+)
 
 
 class AttendanceViewSet(viewsets.ModelViewSet):
@@ -40,6 +45,10 @@ class AttendanceViewSet(viewsets.ModelViewSet):
 
     ordering = ["-date"]
 
+    # =========================================================
+    # QUERYSET
+    # =========================================================
+
     def get_queryset(self):
 
         if getattr(self, "swagger_fake_view", False):
@@ -47,35 +56,53 @@ class AttendanceViewSet(viewsets.ModelViewSet):
 
         user = self.request.user
 
-        if user.role == UserRole.ADMIN:
-            return Attendance.objects.all()
+        queryset = Attendance.objects.select_related(
+            "student__user",
+            "enrollment",
+            "teaching_assignment__teacher__user",
+            "teaching_assignment__subject",
+            "teaching_assignment__class_name",
+            "teaching_assignment__section",
+            "teaching_assignment__academic_session",
+        )
 
+        # ADMIN
+        if user.role == UserRole.ADMIN:
+            return queryset
+
+        # TEACHER
         if user.role == UserRole.TEACHER:
-            return Attendance.objects.filter(
+            return queryset.filter(
                 teaching_assignment__teacher__user=user
             )
 
+        # STUDENT
         if user.role == UserRole.STUDENT:
-            return Attendance.objects.filter(
+            return queryset.filter(
                 student__user=user
             )
 
         return Attendance.objects.none()
+
+    # =========================================================
+    # GET CLASS STUDENTS
+    # =========================================================
+
     @extend_schema(
-    parameters=[
-        OpenApiParameter(
-            name="teaching_assignment",
-            type=OpenApiTypes.INT,
-            location=OpenApiParameter.QUERY,
-            required=True,
-            description="Teaching assignment ID"
-        )
-    ]
+        parameters=[
+            OpenApiParameter(
+                name="teaching_assignment",
+                type=OpenApiTypes.INT,
+                location=OpenApiParameter.QUERY,
+                required=True,
+                description="Teaching assignment ID",
+            )
+        ]
     )
     @action(
         detail=False,
         methods=["get"],
-        url_path="class-students"
+        url_path="class-students",
     )
     def class_students(self, request):
 
@@ -88,22 +115,28 @@ class AttendanceViewSet(viewsets.ModelViewSet):
                 {
                     "detail": "teaching_assignment is required."
                 },
-                status=400
+                status=400,
             )
 
         user = request.user
 
+        # Only teacher can access class students
         if user.role != UserRole.TEACHER:
             return Response(
                 {
                     "detail": "Only teachers can access class students."
                 },
-                status=403
+                status=403,
             )
 
+        # Verify teaching assignment belongs to teacher
         assignment = TeachingAssignment.objects.filter(
             id=teaching_assignment_id,
-            teacher__user=user
+            teacher__user=user,
+        ).select_related(
+            "academic_session",
+            "class_name",
+            "section",
         ).first()
 
         if not assignment:
@@ -111,15 +144,18 @@ class AttendanceViewSet(viewsets.ModelViewSet):
                 {
                     "detail": "Teaching assignment not found."
                 },
-                status=404
+                status=404,
             )
 
+        # Get active students
         enrollments = Enrollment.objects.filter(
             academic_session=assignment.academic_session,
             class_name=assignment.class_name,
             section=assignment.section,
-            status=Enrollment.Status.ACTIVE
-        ).select_related("student__user")
+            status=Enrollment.Status.ACTIVE,
+        ).select_related(
+            "student__user"
+        )
 
         data = [
             {
@@ -128,52 +164,67 @@ class AttendanceViewSet(viewsets.ModelViewSet):
                 "student_name": (
                     f"{enrollment.student.user.first_name} "
                     f"{enrollment.student.user.last_name}"
-                    ).strip(),
+                ).strip(),
             }
             for enrollment in enrollments
         ]
 
         return Response(data)
+
+    # =========================================================
+    # TAKE ATTENDANCE
+    # =========================================================
+
     @action(
-    detail=False,
-    methods=["post"],
-    url_path="take-attendance"
+        detail=False,
+        methods=["post"],
+        url_path="take-attendance",
     )
     def take_attendance(self, request):
 
+        # Only teacher can take attendance
         if request.user.role != UserRole.TEACHER:
             return Response(
                 {
                     "detail": "Only teachers can take attendance."
                 },
-                status=403
+                status=403,
             )
 
+        # Validate request data
         serializer = TakeAttendanceSerializer(
             data=request.data
         )
 
-        serializer.is_valid(raise_exception=True)
+        serializer.is_valid(
+            raise_exception=True
+        )
 
-        teaching_assignment_id = serializer.validated_data[
-            "teaching_assignment"
-        ]
+        teaching_assignment_id = (
+            serializer.validated_data[
+                "teaching_assignment"
+            ]
+        )
 
-        attendance_date = serializer.validated_data[
-            "date"
-        ]
+        attendance_date = (
+            serializer.validated_data[
+                "date"
+            ]
+        )
 
-        attendance_data = serializer.validated_data[
-            "attendance"
-        ]
+        attendance_data = (
+            serializer.validated_data[
+                "attendance"
+            ]
+        )
 
-        # =========================
+        # =====================================================
         # Verify Teaching Assignment
-        # =========================
+        # =====================================================
 
         assignment = TeachingAssignment.objects.filter(
             id=teaching_assignment_id,
-            teacher__user=request.user
+            teacher__user=request.user,
         ).first()
 
         if not assignment:
@@ -181,36 +232,42 @@ class AttendanceViewSet(viewsets.ModelViewSet):
                 {
                     "detail": "Teaching assignment not found."
                 },
-                status=404
+                status=404,
             )
 
-        # =========================
+        # =====================================================
         # Get Active Students
-        # =========================
+        # =====================================================
 
         enrollments = Enrollment.objects.filter(
             academic_session=assignment.academic_session,
             class_name=assignment.class_name,
             section=assignment.section,
-            status=Enrollment.Status.ACTIVE
+            status=Enrollment.Status.ACTIVE,
         )
 
         valid_student_ids = set(
             enrollments.values_list(
                 "student_id",
-                flat=True
+                flat=True,
             )
         )
 
-        # =========================
+        # =====================================================
         # Validate Students
-        # =========================
+        # =====================================================
 
         for item in attendance_data:
 
-            student_id = item.get("student_id")
-            status = item.get("status")
+            student_id = item.get(
+                "student_id"
+            )
 
+            status = item.get(
+                "status"
+            )
+
+            # Check student belongs to class
             if student_id not in valid_student_ids:
                 return Response(
                     {
@@ -219,14 +276,15 @@ class AttendanceViewSet(viewsets.ModelViewSet):
                             "does not belong to this class."
                         )
                     },
-                    status=400
+                    status=400,
                 )
 
+            # Check attendance status
             if status not in [
                 "PRESENT",
                 "ABSENT",
                 "LATE",
-                "EXCUSED"
+                "EXCUSED",
             ]:
                 return Response(
                     {
@@ -235,46 +293,59 @@ class AttendanceViewSet(viewsets.ModelViewSet):
                             f"for student {student_id}."
                         )
                     },
-                    status=400
+                    status=400,
                 )
 
-        # =========================
+        # =====================================================
         # Save Attendance
-        # =========================
+        # =====================================================
 
-        created = []
+        saved_attendance = []
 
         with transaction.atomic():
 
             for item in attendance_data:
 
-                student_id = item["student_id"]
-                status = item["status"]
+                student_id = item[
+                    "student_id"
+                ]
+
+                status = item[
+                    "status"
+                ]
 
                 enrollment = enrollments.get(
                     student_id=student_id
                 )
 
-                attendance, created_new = Attendance.objects.update_or_create(
-                    student_id=student_id,
-                    enrollment=enrollment,
-                    teaching_assignment=assignment,
-                    date=attendance_date,
-                    defaults={
-                        "status": status
-                    }
+                attendance, created_new = (
+                    Attendance.objects.update_or_create(
+                        student_id=student_id,
+                        enrollment=enrollment,
+                        teaching_assignment=assignment,
+                        date=attendance_date,
+                        defaults={
+                            "status": status
+                        },
+                    )
                 )
 
-                created.append(attendance)
+                saved_attendance.append(
+                    attendance
+                )
 
-            return Response(
+        # =====================================================
+        # Response
+        # =====================================================
+
+        return Response(
             {
                 "message": "Attendance saved successfully.",
-                "count": len(created),
+                "count": len(saved_attendance),
                 "attendance": AttendanceSerializer(
-                    created,
-                    many=True
-                ).data
+                    saved_attendance,
+                    many=True,
+                ).data,
             },
-            status=200
+            status=200,
         )
