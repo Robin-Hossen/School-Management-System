@@ -17,23 +17,26 @@ class ExamSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Exam
-        fields = [
-            "id",
-            "name",
-            "exam_type",
+        fields = "__all__"
 
-            "academic_session",
+        extra_fields = [
             "academic_session_name",
-
-            "class_name",
             "class_name_name",
-
-            "start_date",
-            "end_date",
-
-            "created_at",
-            "updated_at",
         ]
+
+    def to_representation(self, instance):
+
+        data = super().to_representation(instance)
+
+        data["academic_session_name"] = (
+            instance.academic_session.name
+        )
+
+        data["class_name_name"] = (
+            instance.class_name.name
+        )
+
+        return data
 
 
 class ExamSubjectSerializer(serializers.ModelSerializer):
@@ -50,31 +53,29 @@ class ExamSubjectSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ExamSubject
-        fields = [
-            "id",
+        fields = "__all__"
 
-            "exam",
-            "exam_name",
+    def to_representation(self, instance):
 
-            "subject",
-            "subject_name",
+        data = super().to_representation(instance)
 
-            "exam_date",
-            "start_time",
-            "end_time",
-            "total_marks",
+        data["exam_name"] = instance.exam.name
+        data["subject_name"] = instance.subject.name
 
-            "created_at",
-            "updated_at",
-        ]
+        return data
 
 
 class ResultSerializer(serializers.ModelSerializer):
 
-    student_name = serializers.SerializerMethodField()
-
     student_code = serializers.CharField(
         source="student.student_id",
+        read_only=True
+    )
+
+    student_name = serializers.SerializerMethodField()
+
+    exam = serializers.IntegerField(
+        source="exam_subject.exam.id",
         read_only=True
     )
 
@@ -93,6 +94,22 @@ class ResultSerializer(serializers.ModelSerializer):
         read_only=True
     )
 
+    class_name = serializers.IntegerField(
+        source="exam_subject.exam.class_name.id",
+        read_only=True
+    )
+
+    class_name_name = serializers.CharField(
+        source="exam_subject.exam.class_name.name",
+        read_only=True
+    )
+
+    grade_point = serializers.DecimalField(
+        max_digits=3,
+        decimal_places=2,
+        read_only=True
+    )
+
     class Meta:
         model = Result
 
@@ -104,8 +121,13 @@ class ResultSerializer(serializers.ModelSerializer):
             "student_name",
 
             "exam_subject",
+
+            "exam",
             "exam_name",
             "subject_name",
+
+            "class_name",
+            "class_name_name",
 
             "marks_obtained",
             "total_marks",
@@ -115,13 +137,6 @@ class ResultSerializer(serializers.ModelSerializer):
 
             "remarks",
 
-            "created_at",
-            "updated_at",
-        ]
-
-        read_only_fields = [
-            "grade",
-            "grade_point",
             "created_at",
             "updated_at",
         ]
