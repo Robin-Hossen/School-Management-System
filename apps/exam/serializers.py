@@ -38,9 +38,35 @@ class ExamSerializer(serializers.ModelSerializer):
 
 class ExamSubjectSerializer(serializers.ModelSerializer):
 
+    exam_name = serializers.CharField(
+        source="exam.name",
+        read_only=True
+    )
+
+    subject_name = serializers.CharField(
+        source="subject.name",
+        read_only=True
+    )
+
     class Meta:
         model = ExamSubject
-        fields = "__all__"
+        fields = [
+            "id",
+
+            "exam",
+            "exam_name",
+
+            "subject",
+            "subject_name",
+
+            "exam_date",
+            "start_time",
+            "end_time",
+            "total_marks",
+
+            "created_at",
+            "updated_at",
+        ]
 
 
 class ResultSerializer(serializers.ModelSerializer):
