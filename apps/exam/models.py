@@ -55,7 +55,7 @@ class ExamSubject(models.Model):
 
 
 class Result(models.Model):
-   
+
     student = models.ForeignKey(
         "students.Student",
         on_delete=models.CASCADE,
@@ -78,18 +78,66 @@ class Result(models.Model):
         blank=True
     )
 
+    grade_point = models.DecimalField(
+        max_digits=3,
+        decimal_places=2,
+        default=0
+    )
+
     remarks = models.CharField(
         max_length=255,
         blank=True
     )
 
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True) 
+    created_at = models.DateTimeField(
+        auto_now_add=True
+    )
+
+    updated_at = models.DateTimeField(
+        auto_now=True
+    )
 
     class Meta:
         constraints = [
             models.UniqueConstraint(
-                fields=["student", "exam_subject"],
+                fields=[
+                    "student",
+                    "exam_subject"
+                ],
                 name="unique_student_exam_subject_result"
             )
-        ]       
+        ]
+
+    def save(self, *args, **kwargs):
+
+        marks = float(self.marks_obtained)
+
+        if marks >= 80:
+            self.grade = "A+"
+            self.grade_point = 5.00
+
+        elif marks >= 70:
+            self.grade = "A"
+            self.grade_point = 4.00
+
+        elif marks >= 60:
+            self.grade = "A-"
+            self.grade_point = 3.50
+
+        elif marks >= 50:
+            self.grade = "B"
+            self.grade_point = 3.00
+
+        elif marks >= 40:
+            self.grade = "C"
+            self.grade_point = 2.00
+
+        elif marks >= 33:
+            self.grade = "D"
+            self.grade_point = 1.00
+
+        else:
+            self.grade = "F"
+            self.grade_point = 0.00
+
+        super().save(*args, **kwargs)

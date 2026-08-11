@@ -71,6 +71,66 @@ class ExamSubjectSerializer(serializers.ModelSerializer):
 
 class ResultSerializer(serializers.ModelSerializer):
 
+    student_name = serializers.SerializerMethodField()
+
+    student_code = serializers.CharField(
+        source="student.student_id",
+        read_only=True
+    )
+
+    exam_name = serializers.CharField(
+        source="exam_subject.exam.name",
+        read_only=True
+    )
+
+    subject_name = serializers.CharField(
+        source="exam_subject.subject.name",
+        read_only=True
+    )
+
+    total_marks = serializers.IntegerField(
+        source="exam_subject.total_marks",
+        read_only=True
+    )
+
     class Meta:
         model = Result
-        fields = "__all__"
+
+        fields = [
+            "id",
+
+            "student",
+            "student_code",
+            "student_name",
+
+            "exam_subject",
+            "exam_name",
+            "subject_name",
+
+            "marks_obtained",
+            "total_marks",
+
+            "grade",
+            "grade_point",
+
+            "remarks",
+
+            "created_at",
+            "updated_at",
+        ]
+
+        read_only_fields = [
+            "grade",
+            "grade_point",
+            "created_at",
+            "updated_at",
+        ]
+
+    def get_student_name(self, obj):
+
+        user = obj.student.user
+
+        return (
+            f"{user.first_name} "
+            f"{user.last_name}"
+        ).strip()
