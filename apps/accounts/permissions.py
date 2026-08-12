@@ -194,19 +194,50 @@ class NoticePermission(BasePermission):
 
 
 class MessagePermission(BasePermission):
+
     def has_permission(self, request, view):
-        return request.user.is_authenticated
+
+        if not request.user.is_authenticated:
+            return False
+
+        # View messages
+        if request.method in ("GET", "HEAD", "OPTIONS"):
+            return True
+
+        # Send message
+        if request.method == "POST":
+            return True
+
+        # Delete message
+        if request.method == "DELETE":
+            return True
+
+        # No edit
+        if request.method in ("PUT", "PATCH"):
+            return False
+
+        return False
 
     def has_object_permission(self, request, view, obj):
-        # Receiver can read
+
+        # Sender or receiver can view
         if request.method in ("GET", "HEAD", "OPTIONS"):
             return (
                 obj.sender == request.user
                 or obj.receiver == request.user
             )
 
-        # Only sender can modify/delete
-        return obj.sender == request.user
+        # Sender or receiver can delete
+        if request.method == "DELETE":
+            return (
+                obj.sender == request.user
+                or obj.receiver == request.user
+            )
+
+        # No edit
+        return False
+
+   
 
 
 
