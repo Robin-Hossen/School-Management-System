@@ -1,4 +1,5 @@
 from django_filters.rest_framework import DjangoFilterBackend
+from .services.email_service import send_payment_confirmation
 from rest_framework import filters, viewsets
 
 from apps.accounts.models import UserRole
@@ -101,6 +102,7 @@ class StudentFeeViewSet(viewsets.ModelViewSet):
 
 
 class PaymentViewSet(viewsets.ModelViewSet):
+
     serializer_class = PaymentSerializer
     permission_classes = [PaymentPermission]
 
@@ -128,7 +130,12 @@ class PaymentViewSet(viewsets.ModelViewSet):
     ordering = ["-payment_date"]
 
     def get_queryset(self):
-        if getattr(self, "swagger_fake_view", False):
+
+        if getattr(
+            self,
+            "swagger_fake_view",
+            False
+        ):
             return Payment.objects.none()
 
         user = self.request.user
@@ -145,3 +152,68 @@ class PaymentViewSet(viewsets.ModelViewSet):
             )
 
         return Payment.objects.none()
+
+    # =================================
+    # CREATE PAYMENT
+    # =================================
+
+    def perform_create(self, serializer):
+
+        notification = self.request.data.get(
+            "notification",
+            "NONE",
+        )
+
+        payment = serializer.save()
+
+        # ---------------------------------
+        # Update StudentFee
+        # ---------------------------------
+
+        student_fee = payment.student_fee
+
+        student_fee.paid_amount += payment.amount
+
+        student_fee.due_amount = (
+            student_fee.amount
+            - student_fee.paid_amount
+        )
+
+        if student_fee.due_amount <= 0:
+
+            student_fee.due_amount = 0
+
+            student_fee.status = "PAID"
+
+        elif student_fee.paid_amount > 0:
+
+            student_fee.status = "PARTIAL"
+
+        else:
+
+            student_fee.status = "PENDING"
+
+        student_fee.save()
+
+        # ---------------------------------
+        # Send Email
+        # ---------------------------------
+
+        if notification != "NONE":
+
+            try:
+
+                send_payment_confirmation(
+                    payment,
+                    notification,
+                )
+
+            except Exception as error:
+
+                # Payment should remain successful
+                # even if email fails.
+
+                print(
+                    "PAYMENT EMAIL ERROR:",
+                    error
+                )
