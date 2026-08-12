@@ -1,8 +1,17 @@
 from django_filters.rest_framework import DjangoFilterBackend
 from .services.email_service import send_payment_confirmation
+from django.core.mail import send_mail
+from django.conf import settings
+
+from decimal import Decimal
+from rest_framework import status
+from rest_framework.response import Response
+
 from rest_framework import filters, viewsets
 
 from apps.accounts.models import UserRole
+
+
 from apps.accounts.permissions import (
     FeeStructurePermission,
     StudentFeePermission,
@@ -131,11 +140,7 @@ class PaymentViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
 
-        if getattr(
-            self,
-            "swagger_fake_view",
-            False
-        ):
+        if getattr(self, "swagger_fake_view", False):
             return Payment.objects.none()
 
         user = self.request.user
@@ -153,67 +158,182 @@ class PaymentViewSet(viewsets.ModelViewSet):
 
         return Payment.objects.none()
 
-    # =================================
-    # CREATE PAYMENT
-    # =================================
+    # =========================
+    # Create Payment
+    # =========================
 
-    def perform_create(self, serializer):
+    def create(self, request, *args, **kwargs):
 
-        notification = self.request.data.get(
-            "notification",
-            "NONE",
+        serializer = self.get_serializer(
+            data=request.data
         )
+
+        serializer.is_valid(
+            raise_exception=True
+        )
+
+        # =========================
+        # Get Student Fee
+        # =========================
+
+        student_fee = serializer.validated_data[
+            "student_fee"
+        ]
+
+        payment_amount = Decimal(
+            str(
+                serializer.validated_data[
+                    "amount"
+                ]
+            )
+        )
+
+        # =========================
+        # Check Due Amount
+        # =========================
+
+        current_due = student_fee.due_amount
+
+        if payment_amount <= 0:
+
+            return Response(
+                {
+                    "detail": "Payment amount must be greater than 0."
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if payment_amount > current_due:
+
+            return Response(
+                {
+                    "detail": (
+                        f"Payment amount cannot be greater "
+                        f"than due amount ({current_due})."
+                    )
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # =========================
+        # Create Payment
+        # =========================
 
         payment = serializer.save()
 
-        # ---------------------------------
-        # Update StudentFee
-        # ---------------------------------
+        # =========================
+        # Update Student Fee
+        # =========================
 
-        student_fee = payment.student_fee
-
-        student_fee.paid_amount += payment.amount
-
-        student_fee.due_amount = (
-            student_fee.amount
-            - student_fee.paid_amount
+        new_paid_amount = (
+            student_fee.paid_amount
+            + payment_amount
         )
 
-        if student_fee.due_amount <= 0:
+        new_due_amount = (
+            student_fee.amount
+            - new_paid_amount
+        )
 
-            student_fee.due_amount = 0
+        # =========================
+        # Determine Status
+        # =========================
 
-            student_fee.status = "PAID"
+        if new_due_amount == 0:
 
-        elif student_fee.paid_amount > 0:
+            new_status = "PAID"
 
-            student_fee.status = "PARTIAL"
+        elif new_paid_amount > 0:
+
+            new_status = "PARTIAL"
 
         else:
 
-            student_fee.status = "PENDING"
+            new_status = "PENDING"
 
-        student_fee.save()
+        student_fee.paid_amount = new_paid_amount
+        student_fee.due_amount = new_due_amount
+        student_fee.status = new_status
 
-        # ---------------------------------
-        # Send Email
-        # ---------------------------------
+        student_fee.save(
+            update_fields=[
+                "paid_amount",
+                "due_amount",
+                "status",
+                "updated_at",
+            ]
+        )
 
-        if notification != "NONE":
+        # =========================
+        # Student Information
+        # =========================
 
-            try:
+        student = student_fee.student
 
-                send_payment_confirmation(
-                    payment,
-                    notification,
-                )
+        user = student.user
 
-            except Exception as error:
+        # =========================
+        # Email
+        # =========================
 
-                # Payment should remain successful
-                # even if email fails.
+        if user.email:
 
-                print(
-                    "PAYMENT EMAIL ERROR:",
-                    error
-                )
+            student_name = (
+                f"{user.first_name} "
+                f"{user.last_name}"
+            ).strip()
+
+            subject = (
+                "Payment Confirmation - "
+                "School Management System"
+            )
+
+            message = f"""
+Dear {student_name},
+
+Your fee payment has been successfully received.
+
+Payment Details
+-------------------------
+
+Student ID: {student.student_id}
+
+Fee: {student_fee.fee_structure.name}
+
+Amount Paid: {payment.amount}
+
+Total Fee: {student_fee.amount}
+
+Paid Amount: {student_fee.paid_amount}
+
+Due Amount: {student_fee.due_amount}
+
+Payment Date: {payment.payment_date}
+
+Payment Method: {payment.payment_method}
+
+Transaction ID: {payment.transaction_id or "N/A"}
+
+Status: {student_fee.status}
+
+Thank you.
+
+School Management System
+"""
+
+            send_mail(
+                subject,
+                message,
+                settings.DEFAULT_FROM_EMAIL,
+                [user.email],
+                fail_silently=False,
+            )
+
+        # =========================
+        # Response
+        # =========================
+
+        return Response(
+            serializer.data,
+            status=status.HTTP_201_CREATED
+        )
