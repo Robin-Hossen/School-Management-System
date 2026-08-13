@@ -8,7 +8,8 @@ from rest_framework import status
 from rest_framework_simplejwt.tokens import RefreshToken
 from .serializers import LogoutSerializer
 from .permissions import IsAdmin,IsTeacher,IsStudent,IsParent,IsAccountant
-
+from rest_framework_simplejwt.views import TokenObtainPairView
+from .serializers import CustomTokenObtainPairSerializer
 
 # Create your views here.
 
@@ -50,3 +51,6 @@ class AdminTestView(APIView):
         return Response({"message":"Welcome Admin!",
                          "user":request.user.email,
                          "role":request.user.role})
+
+class CustomTokenObtainPairView(TokenObtainPairView):
+    serializer_class = CustomTokenObtainPairSerializer    

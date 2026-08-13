@@ -70,3 +70,63 @@ class TeachingAssignmentSerializer(serializers.ModelSerializer):
         user = obj.teacher.user
 
         return f"{user.first_name} {user.last_name}".strip()
+
+
+
+class StudentSubjectSerializer(serializers.ModelSerializer):
+
+    class_name = serializers.CharField(
+        source="class_name.name",
+        read_only=True
+    )
+
+    class Meta:
+        model = Subject
+        fields = [
+            "id",
+            "name",
+            "code",
+            "class_name",
+        ]
+
+
+class StudentClassSerializer(serializers.ModelSerializer):
+
+    class_name = serializers.CharField(
+        source="class_name.name",
+        read_only=True
+    )
+
+    section = serializers.CharField(
+        source="section.name",
+        read_only=True
+    )
+
+    academic_session = serializers.CharField(
+        source="academic_session.name",
+        read_only=True
+    )
+
+    subjects = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Enrollment
+        fields = [
+            "id",
+            "class_name",
+            "section",
+            "academic_session",
+            "status",
+            "subjects",
+        ]
+
+    def get_subjects(self, obj):
+
+        subjects = Subject.objects.filter(
+            class_name=obj.class_name
+        )
+
+        return StudentSubjectSerializer(
+            subjects,
+            many=True
+        ).data
