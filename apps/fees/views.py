@@ -1,6 +1,7 @@
 from django_filters.rest_framework import DjangoFilterBackend
 from django.core.mail import send_mail
 from django.conf import settings
+from django.db import transaction
 
 from decimal import Decimal
 from django.utils import timezone
@@ -281,59 +282,61 @@ class PaymentViewSet(viewsets.ModelViewSet):
             )
 
         # ----------------------------------------------------
-        # Create Payment
+        # Create Payment & Update Student Fee (Atomic)
         # ----------------------------------------------------
 
-        payment = serializer.save()
+        with transaction.atomic():
 
-        # ----------------------------------------------------
-        # Update Student Fee
-        # ----------------------------------------------------
+            payment = serializer.save()
 
-        new_paid_amount = (
-            student_fee.paid_amount
-            + payment_amount
-        )
+            # ------------------------------------------------
+            # Update Student Fee
+            # ------------------------------------------------
 
-        new_due_amount = (
-            student_fee.amount
-            - new_paid_amount
-        )
+            new_paid_amount = (
+                student_fee.paid_amount
+                + payment_amount
+            )
 
-        # ----------------------------------------------------
-        # Determine Status
-        # ----------------------------------------------------
+            new_due_amount = (
+                student_fee.amount
+                - new_paid_amount
+            )
 
-        if new_due_amount == 0:
+            # ------------------------------------------------
+            # Determine Status
+            # ------------------------------------------------
 
-            new_status = "PAID"
+            if new_due_amount == 0:
 
-        elif new_paid_amount > 0:
+                new_status = "PAID"
 
-            new_status = "PARTIAL"
+            elif new_paid_amount > 0:
 
-        else:
+                new_status = "PARTIAL"
 
-            new_status = "PENDING"
+            else:
 
-        student_fee.paid_amount = (
-            new_paid_amount
-        )
+                new_status = "PENDING"
 
-        student_fee.due_amount = (
-            new_due_amount
-        )
+            student_fee.paid_amount = (
+                new_paid_amount
+            )
 
-        student_fee.status = new_status
+            student_fee.due_amount = (
+                new_due_amount
+            )
 
-        student_fee.save(
-            update_fields=[
-                "paid_amount",
-                "due_amount",
-                "status",
-                "updated_at",
-            ]
-        )
+            student_fee.status = new_status
+
+            student_fee.save(
+                update_fields=[
+                    "paid_amount",
+                    "due_amount",
+                    "status",
+                    "updated_at",
+                ]
+            )
 
         # ----------------------------------------------------
         # Student Information
@@ -515,7 +518,7 @@ School Management System
                 line_items=[
                     {
                         "price_data": {
-                            "currency": "bdt",
+                            "currency": "usd",
 
                             "product_data": {
                                 "name":
@@ -642,8 +645,8 @@ School Management System
 
             checkout_session = (
                 stripe.checkout.Session.retrieve(
-                    session_id
-                )
+                session_id
+            )
             )
 
         except stripe.error.StripeError as e:
@@ -651,7 +654,7 @@ School Management System
             return Response(
                 {
                     "detail":
-                    f"Stripe error: {str(e)}"
+                        f"Stripe error: {str(e)}"
                 },
                 status=status.HTTP_400_BAD_REQUEST
             )
@@ -665,7 +668,7 @@ School Management System
             return Response(
                 {
                     "detail":
-                    "Payment has not been completed.",
+                        "Payment has not been completed.",
                     "payment_status":
                         checkout_session.payment_status,
                 },
@@ -673,24 +676,24 @@ School Management System
             )
 
         # ----------------------------------------------------
-        # Get Metadata
+        # Get student fee ID from Metadata
         # ----------------------------------------------------
 
-        metadata = checkout_session.metadata
-
-        student_fee_id = metadata.get(
-            "student_fee_id"
-        )
+        metadata = checkout_session.metadata or {}
+        
+        if isinstance(metadata, dict):
+            student_fee_id = metadata.get("student_fee_id")
+        else:
+            student_fee_id = getattr(metadata, "student_fee_id", None)
 
         if not student_fee_id:
-
             return Response(
                 {
-                    "detail":
-                    "Student fee information is missing."
+                    "detail": "Student fee information is missing."
                 },
                 status=status.HTTP_400_BAD_REQUEST
             )
+        
 
         # ----------------------------------------------------
         # Get Student Fee
@@ -762,72 +765,74 @@ School Management System
             )
 
         # ----------------------------------------------------
-        # Create Payment
+        # Create Payment & Update Student Fee (Atomic)
         # ----------------------------------------------------
 
-        payment = Payment.objects.create(
+        with transaction.atomic():
 
-            student_fee=student_fee,
+            payment = Payment.objects.create(
 
-            amount=payment_amount,
+                student_fee=student_fee,
 
-            payment_date=timezone.now().date(),
+                amount=payment_amount,
 
-            payment_method="CARD",
+                payment_date=timezone.now().date(),
 
-            transaction_id=(
-                checkout_session.payment_intent
-            ),
+                payment_method="CARD",
 
-            remarks="Stripe online payment",
-        )
+                transaction_id=(
+                    checkout_session.payment_intent
+                ),
 
-        # ----------------------------------------------------
-        # Update Student Fee
-        # ----------------------------------------------------
+                remarks="Stripe online payment",
+            )
 
-        new_paid_amount = (
-            student_fee.paid_amount
-            + payment_amount
-        )
+            # ------------------------------------------------
+            # Update Student Fee
+            # ------------------------------------------------
 
-        new_due_amount = (
-            student_fee.amount
-            - new_paid_amount
-        )
+            new_paid_amount = (
+                student_fee.paid_amount
+                + payment_amount
+            )
 
-        if new_due_amount <= 0:
+            new_due_amount = (
+                student_fee.amount
+                - new_paid_amount
+            )
 
-            new_due_amount = Decimal("0.00")
+            if new_due_amount <= 0:
 
-            new_status = "PAID"
+                new_due_amount = Decimal("0.00")
 
-        elif new_paid_amount > 0:
+                new_status = "PAID"
 
-            new_status = "PARTIAL"
+            elif new_paid_amount > 0:
 
-        else:
+                new_status = "PARTIAL"
 
-            new_status = "PENDING"
+            else:
 
-        student_fee.paid_amount = (
-            new_paid_amount
-        )
+                new_status = "PENDING"
 
-        student_fee.due_amount = (
-            new_due_amount
-        )
+            student_fee.paid_amount = (
+                new_paid_amount
+            )
 
-        student_fee.status = new_status
+            student_fee.due_amount = (
+                new_due_amount
+            )
 
-        student_fee.save(
-            update_fields=[
-                "paid_amount",
-                "due_amount",
-                "status",
-                "updated_at",
-            ]
-        )
+            student_fee.status = new_status
+
+            student_fee.save(
+                update_fields=[
+                    "paid_amount",
+                    "due_amount",
+                    "status",
+                    "updated_at",
+                ]
+            )
 
         # ----------------------------------------------------
         # Response
@@ -860,6 +865,4 @@ School Management System
                     payment.transaction_id,
             },
             status=status.HTTP_200_OK
-        )    
-
-        
+        )

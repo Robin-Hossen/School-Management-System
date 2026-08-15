@@ -154,6 +154,44 @@ class StudentFeePermission(BasePermission):
 
 
 class PaymentPermission(BasePermission):
+
+    def has_permission(self, request, view):
+
+        if not request.user.is_authenticated:
+            return False
+
+        # =========================
+        # GET
+        # =========================
+
+        if request.method in ("GET", "HEAD", "OPTIONS"):
+
+            return request.user.role in (
+                UserRole.ADMIN,
+                UserRole.ACCOUNTANT,
+                UserRole.STUDENT,
+            )
+
+        # =========================
+        # Student Stripe Checkout
+        # =========================
+
+        if (
+            request.method == "POST"
+            and getattr(view, "action", None) == "create_checkout"
+        ):
+
+            return request.user.role == UserRole.STUDENT
+
+        # =========================
+        # Admin / Accountant
+        # Manual Payment
+        # =========================
+
+        return request.user.role in (
+            UserRole.ADMIN,
+            UserRole.ACCOUNTANT,
+        )
     def has_permission(self, request, view):
 
         if not request.user.is_authenticated:
