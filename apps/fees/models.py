@@ -113,6 +113,7 @@ class Payment(models.Model):
         ("BANK", "Bank"),
         ("MOBILE_BANKING", "Mobile Banking"),
         ("CARD", "Card"),
+        ("ONLINE","Online"),
     ]
 
     student_fee = models.ForeignKey(
@@ -136,6 +137,19 @@ class Payment(models.Model):
     transaction_id = models.CharField(
         max_length=100,
         blank=True
+    )
+
+    stripe_session_id = models.CharField(
+        max_length=255,
+        blank=True,
+        null=True,
+        unique=True
+    )
+
+    stripe_payment_intent_id = models.CharField(
+        max_length=255,
+        blank=True,
+        null=True
     )
 
     remarks = models.CharField(

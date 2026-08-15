@@ -232,3 +232,17 @@ DEFAULT_FROM_EMAIL = config(
     "DEFAULT_FROM_EMAIL",
     default=EMAIL_HOST_USER
 )
+
+
+# =========================
+# Stripe Configuration
+# =========================
+
+STRIPE_SECRET_KEY = config(
+    "STRIPE_SECRET_KEY"
+)
+
+STRIPE_WEBHOOK_SECRET = config(
+    "STRIPE_WEBHOOK_SECRET",
+    default=""
+)
