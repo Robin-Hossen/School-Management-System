@@ -1,12 +1,14 @@
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters, viewsets
 from rest_framework.decorators import action
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from django.db import transaction
 
 from apps.accounts.models import UserRole
 from apps.accounts.permissions import AttendancePermission
 from apps.academic.models import Enrollment, TeachingAssignment
+from apps.students.models import Student
 
 from .filters import AttendanceFilter
 from .models import Attendance
@@ -349,3 +351,61 @@ class AttendanceViewSet(viewsets.ModelViewSet):
             },
             status=200,
         )
+
+    @action(
+        detail=False,
+        methods=["get"],
+        url_path="my-attendance",
+        permission_classes=[IsAuthenticated]
+    )
+    def my_attendance(self, request):
+
+        try:
+            student = Student.objects.get(user=request.user)
+        except Student.DoesNotExist:
+            return Response(
+                {"detail": "Student profile not found."},
+                status=404
+            )
+
+        attendance = Attendance.objects.filter(
+            student=student
+        ).select_related(
+            "student",
+            "teaching_assignment",
+            "teaching_assignment__subject",
+            "teaching_assignment__class_name",
+            "teaching_assignment__section",
+            "teaching_assignment__academic_session",
+        ).order_by("-date")
+
+        serializer = AttendanceSerializer(
+            attendance,
+            many=True
+        )
+
+        total = attendance.count()
+        present = attendance.filter(status="PRESENT").count()
+        absent = attendance.filter(status="ABSENT").count()
+        late = attendance.filter(status="LATE").count()
+        excused = attendance.filter(status="EXCUSED").count()
+
+        percentage = 0
+
+        if total > 0:
+            percentage = round(
+                ((present + late) / total) * 100,
+                2
+            )
+
+        return Response({
+            "summary": {
+                "total": total,
+                "present": present,
+                "absent": absent,
+                "late": late,
+                "excused": excused,
+                "percentage": percentage,
+            },
+            "attendance": serializer.data
+        })
