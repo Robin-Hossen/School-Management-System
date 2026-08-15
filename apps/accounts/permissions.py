@@ -155,22 +155,44 @@ class StudentFeePermission(BasePermission):
 
 class PaymentPermission(BasePermission):
     def has_permission(self, request, view):
+
         if not request.user.is_authenticated:
             return False
 
-        # Admin, Accountant and Student can view
+        # =========================
+        # Read Payments
+        # =========================
+
         if request.method in ("GET", "HEAD", "OPTIONS"):
+
             return request.user.role in (
                 UserRole.ADMIN,
                 UserRole.ACCOUNTANT,
                 UserRole.STUDENT,
             )
 
-        # Only Admin and Accountant can create/update/delete
+        # =========================
+        # Online Checkout
+        # Student can initiate
+        # =========================
+
+        if getattr(view, "action", None) == "create_checkout":
+
+            return request.user.role in (
+                UserRole.ADMIN,
+                UserRole.ACCOUNTANT,
+                UserRole.STUDENT,
+            )
+
+        # =========================
+        # Manual Payment
+        # Only Admin / Accountant
+        # =========================
+
         return request.user.role in (
             UserRole.ADMIN,
             UserRole.ACCOUNTANT,
-        )    
+        )   
 
 
 class NoticePermission(BasePermission):
