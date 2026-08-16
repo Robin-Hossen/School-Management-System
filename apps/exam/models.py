@@ -1,5 +1,5 @@
 from django.db import models
-from apps.academic.models import AcademicSession, Class, Subject
+from apps.academic.models import AcademicSession, Class, Subject,TeachingAssignment
 
 
 class Exam(models.Model):
@@ -24,6 +24,56 @@ class Exam(models.Model):
         return f"{self.name} - {self.exam_type} - {self.academic_session.name} - {self.class_name.name}"
 
 class ExamSubject(models.Model):
+
+    exam = models.ForeignKey(
+        Exam,
+        on_delete=models.CASCADE,
+        related_name="exam_subjects"
+    )
+
+    subject = models.ForeignKey(
+        Subject,
+        on_delete=models.CASCADE,
+        related_name="exam_subjects"
+    )
+
+    teaching_assignment = models.ForeignKey(
+        TeachingAssignment,
+        on_delete=models.CASCADE,
+        related_name="exam_subjects",
+        null=True,
+        blank=True,
+    )
+
+    exam_date = models.DateField()
+
+    start_time = models.TimeField()
+
+    end_time = models.TimeField()
+
+    total_marks = models.PositiveIntegerField(
+        default=100
+    )
+
+    created_at = models.DateTimeField(
+        auto_now_add=True
+    )
+
+    updated_at = models.DateTimeField(
+        auto_now=True
+    )
+
+    class Meta:
+
+        constraints = [
+            models.UniqueConstraint(
+                fields=[
+                    "exam",
+                    "subject"
+                ],
+                name="unique_exam_subject"
+            )
+        ]
     
     exam = models.ForeignKey(
         Exam,
