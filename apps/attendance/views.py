@@ -35,7 +35,10 @@ class AttendanceViewSet(viewsets.ModelViewSet):
     filterset_class = AttendanceFilter
 
     search_fields = [
-        "remarks",
+    "student__student_id",
+    "student__user__first_name",
+    "student__user__last_name",
+    "remarks",
     ]
 
     ordering_fields = [
@@ -195,14 +198,14 @@ class AttendanceViewSet(viewsets.ModelViewSet):
 
         # Validate request data
         serializer = TakeAttendanceSerializer(
-            data=request.data
+                data=request.data
         )
 
         serializer.is_valid(
             raise_exception=True
         )
 
-        teaching_assignment_id = (
+        teaching_assignment = (
             serializer.validated_data[
                 "teaching_assignment"
             ]
@@ -219,13 +222,12 @@ class AttendanceViewSet(viewsets.ModelViewSet):
                 "attendance"
             ]
         )
-
         # =====================================================
         # Verify Teaching Assignment
         # =====================================================
 
         assignment = TeachingAssignment.objects.filter(
-            id=teaching_assignment_id,
+            id=teaching_assignment.pk,
             teacher__user=request.user,
         ).first()
 
