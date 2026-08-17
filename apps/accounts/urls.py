@@ -7,6 +7,7 @@ from .views import (
     AdminTestView,
     LogoutView,
     CustomTokenObtainPairView,
+    ChangePasswordView,
 )
 
 urlpatterns = [
@@ -45,4 +46,9 @@ urlpatterns = [
         AdminTestView.as_view(),
         name="admin-test"
     ),
+    path(
+    "change-password/",
+    ChangePasswordView.as_view(),
+    name="change-password"
+),
 ]

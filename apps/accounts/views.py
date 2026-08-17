@@ -6,10 +6,15 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework_simplejwt.tokens import RefreshToken
-from .serializers import LogoutSerializer
 from .permissions import IsAdmin,IsTeacher,IsStudent,IsParent,IsAccountant
 from rest_framework_simplejwt.views import TokenObtainPairView
-from .serializers import CustomTokenObtainPairSerializer
+from .serializers import (
+    ProfileSerializers,
+    RegistrationSerializer,
+    LogoutSerializer,
+    CustomTokenObtainPairSerializer,
+    ChangePasswordSerializer,
+)
 
 # Create your views here.
 
@@ -17,12 +22,41 @@ class RegisterView(generics.CreateAPIView):
     serializer_class=RegistrationSerializer
     permission_classes=[AllowAny] #login ba token na thakleo register korte parbe, tai amra AllowAny permission use korbo
 
+
+
 class ProfileView(generics.RetrieveUpdateAPIView):
     serializer_class=ProfileSerializers
     permission_classes=[IsAuthenticated] #login thakle profile dekhte parbe,
 
     def get_object(self):
         return self.request.user
+
+class ChangePasswordView(generics.GenericAPIView):
+
+    serializer_class = ChangePasswordSerializer
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+
+        serializer = self.get_serializer(
+            data=request.data,
+            context={
+                "request": request
+            }
+        )
+
+        serializer.is_valid(
+            raise_exception=True
+        )
+
+        serializer.save()
+
+        return Response(
+            {
+                "detail": "Password changed successfully."
+            },
+            status=status.HTTP_200_OK
+        )
 
 #LogoutView
 class LogoutView(APIView):
@@ -49,8 +83,10 @@ class AdminTestView(APIView):
 
     def get(self,request):
         return Response({"message":"Welcome Admin!",
-                         "user":request.user.email,
-                         "role":request.user.role})
+                        "user":request.user.email,
+                        "role":request.user.role})
 
 class CustomTokenObtainPairView(TokenObtainPairView):
     serializer_class = CustomTokenObtainPairSerializer    
+
+
