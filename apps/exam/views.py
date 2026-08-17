@@ -1,7 +1,7 @@
 from django.db import transaction
 from django_filters.rest_framework import DjangoFilterBackend
 
-from rest_framework import filters, serializers, viewsets
+from rest_framework import filters, serializers, viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
@@ -35,6 +35,7 @@ from .serializers import (
     ExamSerializer,
     ExamSubjectSerializer,
     ResultSerializer,
+    EnterResultsSerializer,
 )
 
 
@@ -72,7 +73,9 @@ class ExamViewSet(viewsets.ModelViewSet):
         "updated_at",
     ]
 
-    ordering = ["-start_date"]
+    ordering = [
+        "-start_date",
+    ]
 
 
 # =========================================================
@@ -115,6 +118,43 @@ class ExamSubjectViewSet(viewsets.ModelViewSet):
     ]
 
 
+    @action(
+    detail=False,
+    methods=["get"],
+    url_path="my-exams"
+    )
+    def my_exams(self, request):
+
+        exam_subjects = (
+            ExamSubject.objects
+            .filter(
+                teaching_assignment__teacher__user=request.user
+        )
+        .select_related(
+            "exam",
+            "exam__academic_session",
+            "exam__class_name",
+            "subject",
+            "teaching_assignment",
+            "teaching_assignment__teacher",
+            "teaching_assignment__class_name",
+            "teaching_assignment__section",
+            "teaching_assignment__academic_session",
+        )
+        .order_by(
+            "exam_date",
+            "start_time"
+        )
+        )
+
+        serializer = self.get_serializer(
+            exam_subjects,
+            many=True
+        )
+
+        return Response(serializer.data)
+
+
 # =========================================================
 # Result ViewSet
 # =========================================================
@@ -150,7 +190,9 @@ class ResultViewSet(viewsets.ModelViewSet):
         "updated_at",
     ]
 
-    ordering = ["-marks_obtained"]
+    ordering = [
+        "-marks_obtained",
+    ]
 
     # =====================================================
     # QUERYSET
@@ -158,7 +200,7 @@ class ResultViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
 
-        # Swagger schema protection
+        # Swagger protection
         if getattr(
             self,
             "swagger_fake_view",
@@ -199,7 +241,7 @@ class ResultViewSet(viewsets.ModelViewSet):
 
             return queryset.filter(
                 exam_subject__teaching_assignment__teacher__user=user
-            )
+            ).distinct()
 
         # =================================================
         # STUDENT
@@ -212,7 +254,7 @@ class ResultViewSet(viewsets.ModelViewSet):
             )
 
         # =================================================
-        # OTHER
+        # OTHER USERS
         # =================================================
 
         return Result.objects.none()
@@ -248,9 +290,9 @@ class ResultViewSet(viewsets.ModelViewSet):
             return Response(
                 {
                     "detail":
-                    "Only teachers can access class students."
+                        "Only teachers can access class students."
                 },
-                status=403,
+                status=status.HTTP_403_FORBIDDEN,
             )
 
         # =================================================
@@ -266,9 +308,9 @@ class ResultViewSet(viewsets.ModelViewSet):
             return Response(
                 {
                     "detail":
-                    "exam_subject is required."
+                        "exam_subject is required."
                 },
-                status=400,
+                status=status.HTTP_400_BAD_REQUEST,
             )
 
         # =================================================
@@ -302,9 +344,9 @@ class ResultViewSet(viewsets.ModelViewSet):
             return Response(
                 {
                     "detail":
-                    "Exam subject not found."
+                        "Exam subject not found."
                 },
-                status=404,
+                status=status.HTTP_404_NOT_FOUND,
             )
 
         # =================================================
@@ -318,10 +360,10 @@ class ResultViewSet(viewsets.ModelViewSet):
             return Response(
                 {
                     "detail":
-                    "No teaching assignment is linked "
-                    "to this exam subject."
+                        "No teaching assignment is linked "
+                        "to this exam subject."
                 },
-                status=400,
+                status=status.HTTP_400_BAD_REQUEST,
             )
 
         # =================================================
@@ -333,9 +375,9 @@ class ResultViewSet(viewsets.ModelViewSet):
             return Response(
                 {
                     "detail":
-                    "You are not assigned to this subject."
+                        "You are not assigned to this subject."
                 },
-                status=403,
+                status=status.HTTP_403_FORBIDDEN,
             )
 
         # =================================================
@@ -367,7 +409,7 @@ class ResultViewSet(viewsets.ModelViewSet):
         }
 
         # =================================================
-        # Response Data
+        # Response
         # =================================================
 
         data = []
@@ -382,52 +424,54 @@ class ResultViewSet(viewsets.ModelViewSet):
 
             data.append(
                 {
-                    "student_id": student.id,
+                    "student_id":
+                        student.id,
 
-                    "student_code": student.student_id,
+                    "student_code":
+                        student.student_id,
 
-                    "student_name": (
-                        f"{student.user.first_name} "
-                        f"{student.user.last_name}"
-                    ).strip(),
+                    "student_name":
+                        (
+                            f"{student.user.first_name} "
+                            f"{student.user.last_name}"
+                        ).strip(),
 
-                    "exam_subject": exam_subject.id,
+                    "exam_subject":
+                        exam_subject.id,
 
-                    "exam_name": exam_subject.exam.name,
+                    "exam_name":
+                        exam_subject.exam.name,
 
-                    "subject_name": exam_subject.subject.name,
+                    "subject_name":
+                        exam_subject.subject.name,
 
-                    "total_marks": exam_subject.total_marks,
+                    "total_marks":
+                        exam_subject.total_marks,
 
-                    "result_id": (
+                    "result_id":
                         result.id
                         if result
-                        else None
-                    ),
+                        else None,
 
-                    "marks_obtained": (
+                    "marks_obtained":
                         float(result.marks_obtained)
                         if result
-                        else None
-                    ),
+                        else None,
 
-                    "grade": (
+                    "grade":
                         result.grade
                         if result
-                        else None
-                    ),
+                        else None,
 
-                    "grade_point": (
+                    "grade_point":
                         float(result.grade_point)
                         if result
-                        else None
-                    ),
+                        else None,
 
-                    "remarks": (
+                    "remarks":
                         result.remarks
                         if result
-                        else ""
-                    ),
+                        else "",
                 }
             )
 
@@ -438,7 +482,7 @@ class ResultViewSet(viewsets.ModelViewSet):
     # =====================================================
 
     @extend_schema(
-        request=None,
+        request=EnterResultsSerializer,
         responses=ResultSerializer(many=True),
     )
     @action(
@@ -449,7 +493,7 @@ class ResultViewSet(viewsets.ModelViewSet):
     def enter_results(self, request):
 
         # =================================================
-        # Only Teacher / Admin
+        # Permission
         # =================================================
 
         if request.user.role not in (
@@ -460,9 +504,9 @@ class ResultViewSet(viewsets.ModelViewSet):
             return Response(
                 {
                     "detail":
-                    "Only teachers and admins can enter results."
+                        "Only teachers and admins can enter results."
                 },
-                status=403,
+                status=status.HTTP_403_FORBIDDEN,
             )
 
         # =================================================
@@ -478,7 +522,7 @@ class ResultViewSet(viewsets.ModelViewSet):
         )
 
         # =================================================
-        # Validate Exam Subject
+        # Validation
         # =================================================
 
         if not exam_subject_id:
@@ -486,23 +530,19 @@ class ResultViewSet(viewsets.ModelViewSet):
             return Response(
                 {
                     "detail":
-                    "exam_subject is required."
+                        "exam_subject is required."
                 },
-                status=400,
+                status=status.HTTP_400_BAD_REQUEST,
             )
-
-        # =================================================
-        # Validate Results
-        # =================================================
 
         if not isinstance(results, list):
 
             return Response(
                 {
                     "detail":
-                    "results must be a list."
+                        "results must be a list."
                 },
-                status=400,
+                status=status.HTTP_400_BAD_REQUEST,
             )
 
         if not results:
@@ -510,9 +550,9 @@ class ResultViewSet(viewsets.ModelViewSet):
             return Response(
                 {
                     "detail":
-                    "results must not be empty."
+                        "results must not be empty."
                 },
-                status=400,
+                status=status.HTTP_400_BAD_REQUEST,
             )
 
         # =================================================
@@ -544,28 +584,26 @@ class ResultViewSet(viewsets.ModelViewSet):
             return Response(
                 {
                     "detail":
-                    "Exam subject not found."
+                        "Exam subject not found."
                 },
-                status=404,
+                status=status.HTTP_404_NOT_FOUND,
             )
 
         # =================================================
         # Teaching Assignment
         # =================================================
 
-        assignment = (
-            exam_subject.teaching_assignment
-        )
+        assignment = exam_subject.teaching_assignment
 
         if not assignment:
 
             return Response(
                 {
                     "detail":
-                    "No teaching assignment is linked "
-                    "to this exam subject."
+                        "No teaching assignment is linked "
+                        "to this exam subject."
                 },
-                status=400,
+                status=status.HTTP_400_BAD_REQUEST,
             )
 
         # =================================================
@@ -579,9 +617,9 @@ class ResultViewSet(viewsets.ModelViewSet):
                 return Response(
                     {
                         "detail":
-                        "You are not assigned to this subject."
+                            "You are not assigned to this subject."
                     },
-                    status=403,
+                    status=status.HTTP_403_FORBIDDEN,
                 )
 
         # =================================================
@@ -602,10 +640,6 @@ class ResultViewSet(viewsets.ModelViewSet):
 
                 for item in results:
 
-                    # =====================================
-                    # Get Data
-                    # =====================================
-
                     student_id = item.get(
                         "student"
                     )
@@ -620,7 +654,7 @@ class ResultViewSet(viewsets.ModelViewSet):
                     )
 
                     # =====================================
-                    # Student Validation
+                    # Student Required
                     # =====================================
 
                     if not student_id:
@@ -628,12 +662,12 @@ class ResultViewSet(viewsets.ModelViewSet):
                         raise serializers.ValidationError(
                             {
                                 "detail":
-                                "student is required."
+                                    "student is required."
                             }
                         )
 
                     # =====================================
-                    # Marks Validation
+                    # Marks Required
                     # =====================================
 
                     if marks_obtained is None:
@@ -641,10 +675,14 @@ class ResultViewSet(viewsets.ModelViewSet):
                         raise serializers.ValidationError(
                             {
                                 "detail":
-                                f"Marks are required "
-                                f"for student {student_id}."
+                                    f"Marks are required "
+                                    f"for student {student_id}."
                             }
                         )
+
+                    # =====================================
+                    # Marks Validation
+                    # =====================================
 
                     try:
 
@@ -654,14 +692,14 @@ class ResultViewSet(viewsets.ModelViewSet):
 
                     except (
                         TypeError,
-                        ValueError
+                        ValueError,
                     ):
 
                         raise serializers.ValidationError(
                             {
                                 "detail":
-                                f"Invalid marks "
-                                f"for student {student_id}."
+                                    f"Invalid marks "
+                                    f"for student {student_id}."
                             }
                         )
 
@@ -677,15 +715,15 @@ class ResultViewSet(viewsets.ModelViewSet):
                         raise serializers.ValidationError(
                             {
                                 "detail":
-                                f"Marks for student "
-                                f"{student_id} must be "
-                                f"between 0 and "
-                                f"{total_marks}."
+                                    f"Marks for student "
+                                    f"{student_id} must be "
+                                    f"between 0 and "
+                                    f"{total_marks}."
                             }
                         )
 
                     # =====================================
-                    # Student Enrollment Check
+                    # Enrollment Validation
                     # =====================================
 
                     is_valid_student = (
@@ -717,14 +755,14 @@ class ResultViewSet(viewsets.ModelViewSet):
                         raise serializers.ValidationError(
                             {
                                 "detail":
-                                f"Student {student_id} "
-                                "is not enrolled in the "
-                                "assigned class/section."
+                                    f"Student {student_id} "
+                                    "is not enrolled in the "
+                                    "assigned class/section."
                             }
                         )
 
                     # =====================================
-                    # Create / Update Result
+                    # Create / Update
                     # =====================================
 
                     result, created = (
@@ -747,12 +785,15 @@ class ResultViewSet(viewsets.ModelViewSet):
                     )
 
                     # =====================================
-                    # Response Data
+                    # Serialize
                     # =====================================
 
                     saved_results.append(
                         ResultSerializer(
-                            result
+                            result,
+                            context={
+                                "request": request
+                            }
                         ).data
                     )
 
@@ -760,34 +801,34 @@ class ResultViewSet(viewsets.ModelViewSet):
 
             return Response(
                 error.detail,
-                status=400,
+                status=status.HTTP_400_BAD_REQUEST,
             )
 
         # =================================================
-        # Final Response
+        # Response
         # =================================================
 
         return Response(
             {
                 "message":
-                "Results saved successfully.",
+                    "Results saved successfully.",
 
                 "exam_subject":
-                exam_subject.id,
+                    exam_subject.id,
 
                 "exam_name":
-                exam_subject.exam.name,
+                    exam_subject.exam.name,
 
                 "subject_name":
-                exam_subject.subject.name,
+                    exam_subject.subject.name,
 
                 "total_marks":
-                total_marks,
+                    total_marks,
 
                 "results":
-                saved_results,
+                    saved_results,
             },
-            status=200,
+            status=status.HTTP_200_OK,
         )
 
     # =====================================================
@@ -809,7 +850,9 @@ class ResultViewSet(viewsets.ModelViewSet):
                 type=OpenApiTypes.INT,
                 location=OpenApiParameter.QUERY,
                 required=False,
-                description="Exam ID (optional)",
+                description=(
+                    "Exam ID. If omitted, all exams are considered."
+                ),
             ),
         ]
     )
@@ -819,10 +862,6 @@ class ResultViewSet(viewsets.ModelViewSet):
         url_path="student-gpa",
     )
     def student_gpa(self, request):
-
-        # =================================================
-        # Parameters
-        # =================================================
 
         student_id = request.query_params.get(
             "student"
@@ -841,13 +880,42 @@ class ResultViewSet(viewsets.ModelViewSet):
             return Response(
                 {
                     "detail":
-                    "student is required."
+                        "student is required."
                 },
-                status=400,
+                status=status.HTTP_400_BAD_REQUEST,
             )
 
         # =================================================
-        # Base Queryset
+        # Student Security
+        # =================================================
+
+        if request.user.role == UserRole.STUDENT:
+
+            try:
+                own_student = request.user.student_profile
+
+            except Exception:
+
+                return Response(
+                    {
+                        "detail":
+                            "Student profile not found."
+                    },
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+
+            if int(student_id) != own_student.id:
+
+                return Response(
+                    {
+                        "detail":
+                            "You can only view your own result."
+                    },
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+
+        # =================================================
+        # Query
         # =================================================
 
         queryset = (
@@ -873,7 +941,7 @@ class ResultViewSet(viewsets.ModelViewSet):
             )
 
         # =================================================
-        # Check Results
+        # No Result
         # =================================================
 
         if not queryset.exists():
@@ -881,9 +949,9 @@ class ResultViewSet(viewsets.ModelViewSet):
             return Response(
                 {
                     "detail":
-                    "No results found."
+                        "No results found."
                 },
-                status=404,
+                status=status.HTTP_404_NOT_FOUND,
             )
 
         # =================================================
@@ -893,16 +961,6 @@ class ResultViewSet(viewsets.ModelViewSet):
         first_result = queryset.first()
 
         student = first_result.student
-
-        # =================================================
-        # Exam
-        # =================================================
-
-        exam = (
-            first_result
-            .exam_subject
-            .exam
-        )
 
         # =================================================
         # Calculate
@@ -935,6 +993,24 @@ class ResultViewSet(viewsets.ModelViewSet):
         )
 
         # =================================================
+        # Exam
+        # =================================================
+
+        if exam_id:
+
+            exam = first_result.exam_subject.exam
+
+            exam_response = exam.id
+
+            exam_name_response = exam.name
+
+        else:
+
+            exam_response = None
+
+            exam_name_response = "All Exams"
+
+        # =================================================
         # Response
         # =================================================
 
@@ -953,10 +1029,10 @@ class ResultViewSet(viewsets.ModelViewSet):
                     ).strip(),
 
                 "exam":
-                    exam.id,
+                    exam_response,
 
                 "exam_name":
-                    exam.name,
+                    exam_name_response,
 
                 "total_subjects":
                     total_subjects,
@@ -978,5 +1054,531 @@ class ResultViewSet(viewsets.ModelViewSet):
                         gpa,
                         2,
                     ),
+            }
+        )
+
+    # =====================================================
+    # EXAM-WISE STUDENT RESULT
+    # =====================================================
+
+    @extend_schema(
+        parameters=[
+            OpenApiParameter(
+                name="student",
+                type=OpenApiTypes.INT,
+                location=OpenApiParameter.QUERY,
+                required=True,
+                description="Student ID",
+            ),
+
+            OpenApiParameter(
+                name="exam",
+                type=OpenApiTypes.INT,
+                location=OpenApiParameter.QUERY,
+                required=True,
+                description="Exam ID",
+            ),
+        ]
+    )
+    @action(
+        detail=False,
+        methods=["get"],
+        url_path="exam-result",
+    )
+    def exam_result(self, request):
+
+        student_id = request.query_params.get(
+            "student"
+        )
+
+        exam_id = request.query_params.get(
+            "exam"
+        )
+
+        # =================================================
+        # Validation
+        # =================================================
+
+        if not student_id:
+
+            return Response(
+                {
+                    "detail":
+                        "student is required."
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if not exam_id:
+
+            return Response(
+                {
+                    "detail":
+                        "exam is required."
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # =================================================
+        # Student Security
+        # =================================================
+
+        if request.user.role == UserRole.STUDENT:
+
+            try:
+                own_student = request.user.student_profile
+
+            except Exception:
+
+                return Response(
+                    {
+                        "detail":
+                            "Student profile not found."
+                    },
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+
+            if int(student_id) != own_student.id:
+
+                return Response(
+                    {
+                        "detail":
+                            "You can only view your own result."
+                    },
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+
+        # =================================================
+        # Get Results
+        # =================================================
+
+        queryset = (
+            Result.objects
+            .filter(
+                student_id=student_id,
+                exam_subject__exam_id=exam_id,
+            )
+            .select_related(
+                "student__user",
+                "exam_subject__exam",
+                "exam_subject__subject",
+            )
+            .order_by(
+                "exam_subject__subject__name"
+            )
+        )
+
+        # =================================================
+        # No Result
+        # =================================================
+
+        if not queryset.exists():
+
+            return Response(
+                {
+                    "detail":
+                        "No results found."
+                },
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        # =================================================
+        # Student / Exam
+        # =================================================
+
+        first_result = queryset.first()
+
+        student = first_result.student
+
+        exam = first_result.exam_subject.exam
+
+        # =================================================
+        # Subjects
+        # =================================================
+
+        subjects = []
+
+        total_marks_obtained = 0
+
+        total_possible_marks = 0
+
+        total_grade_points = 0
+
+        for result in queryset:
+
+            marks = float(
+                result.marks_obtained
+            )
+
+            subject_total_marks = (
+                result.exam_subject.total_marks
+            )
+
+            grade_point = float(
+                result.grade_point
+            )
+
+            total_marks_obtained += marks
+
+            total_possible_marks += (
+                subject_total_marks
+            )
+
+            total_grade_points += (
+                grade_point
+            )
+
+            subjects.append(
+                {
+                    "result_id":
+                        result.id,
+
+                    "subject_id":
+                        result.exam_subject.subject.id,
+
+                    "subject_name":
+                        result.exam_subject.subject.name,
+
+                    "marks_obtained":
+                        marks,
+
+                    "total_marks":
+                        subject_total_marks,
+
+                    "grade":
+                        result.grade,
+
+                    "grade_point":
+                        grade_point,
+
+                    "remarks":
+                        result.remarks,
+                }
+            )
+
+        # =================================================
+        # Summary
+        # =================================================
+
+        total_subjects = queryset.count()
+
+        average_marks = (
+            total_marks_obtained /
+            total_subjects
+        )
+
+        gpa = (
+            total_grade_points /
+            total_subjects
+        )
+
+        # =================================================
+        # Response
+        # =================================================
+
+        return Response(
+            {
+                "student": {
+                    "id":
+                        student.id,
+
+                    "code":
+                        student.student_id,
+
+                    "name":
+                        (
+                            f"{student.user.first_name} "
+                            f"{student.user.last_name}"
+                        ).strip(),
+                },
+
+                "exam": {
+                    "id":
+                        exam.id,
+
+                    "name":
+                        exam.name,
+                },
+
+                "subjects":
+                    subjects,
+
+                "summary": {
+                    "total_subjects":
+                        total_subjects,
+
+                    "total_marks":
+                        round(
+                            total_marks_obtained,
+                            2,
+                        ),
+
+                    "total_possible_marks":
+                        total_possible_marks,
+
+                    "average_marks":
+                        round(
+                            average_marks,
+                            2,
+                        ),
+
+                    "gpa":
+                        round(
+                            gpa,
+                            2,
+                        ),
+                },
+            }
+        )
+
+    # =====================================================
+    # MY RESULT
+    # =====================================================
+
+    @extend_schema(
+        parameters=[
+            OpenApiParameter(
+                name="exam",
+                type=OpenApiTypes.INT,
+                location=OpenApiParameter.QUERY,
+                required=False,
+                description="Exam ID (optional)",
+            )
+        ]
+    )
+    @action(
+        detail=False,
+        methods=["get"],
+        url_path="my-result",
+    )
+    def my_result(self, request):
+
+        # =================================================
+        # Only Student
+        # =================================================
+
+        if request.user.role != UserRole.STUDENT:
+
+            return Response(
+                {
+                    "detail":
+                        "Only students can access this endpoint."
+                },
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        # =================================================
+        # Student Profile
+        # =================================================
+
+        try:
+
+            student = request.user.student_profile
+
+        except Exception:
+
+            return Response(
+                {
+                    "detail":
+                        "Student profile not found."
+                },
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        # =================================================
+        # Exam
+        # =================================================
+
+        exam_id = request.query_params.get(
+            "exam"
+        )
+
+        # =================================================
+        # Query
+        # =================================================
+
+        queryset = (
+            Result.objects
+            .filter(
+                student=student
+            )
+            .select_related(
+                "student__user",
+                "exam_subject__exam",
+                "exam_subject__subject",
+            )
+            .order_by(
+                "exam_subject__subject__name"
+            )
+        )
+
+        # =================================================
+        # Exam Filter
+        # =================================================
+
+        if exam_id:
+
+            queryset = queryset.filter(
+                exam_subject__exam_id=exam_id
+            )
+
+        # =================================================
+        # No Results
+        # =================================================
+
+        if not queryset.exists():
+
+            return Response(
+                {
+                    "detail":
+                        "No results found."
+                },
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        # =================================================
+        # Student / Exam
+        # =================================================
+
+        first_result = queryset.first()
+
+        exam = first_result.exam_subject.exam
+
+        # =================================================
+        # Subjects
+        # =================================================
+
+        subjects = []
+
+        total_marks_obtained = 0
+
+        total_possible_marks = 0
+
+        total_grade_points = 0
+
+        for result in queryset:
+
+            marks = float(
+                result.marks_obtained
+            )
+
+            subject_total_marks = (
+                result.exam_subject.total_marks
+            )
+
+            grade_point = float(
+                result.grade_point
+            )
+
+            total_marks_obtained += marks
+
+            total_possible_marks += (
+                subject_total_marks
+            )
+
+            total_grade_points += (
+                grade_point
+            )
+
+            subjects.append(
+                {
+                    "result_id":
+                        result.id,
+
+                    "subject_id":
+                        result.exam_subject.subject.id,
+
+                    "subject_name":
+                        result.exam_subject.subject.name,
+
+                    "marks_obtained":
+                        marks,
+
+                    "total_marks":
+                        subject_total_marks,
+
+                    "grade":
+                        result.grade,
+
+                    "grade_point":
+                        grade_point,
+
+                    "remarks":
+                        result.remarks,
+                }
+            )
+
+        # =================================================
+        # Summary
+        # =================================================
+
+        total_subjects = queryset.count()
+
+        average_marks = (
+            total_marks_obtained /
+            total_subjects
+        )
+
+        gpa = (
+            total_grade_points /
+            total_subjects
+        )
+
+        # =================================================
+        # Response
+        # =================================================
+
+        return Response(
+            {
+                "student": {
+                    "id":
+                        student.id,
+
+                    "code":
+                        student.student_id,
+
+                    "name":
+                        (
+                            f"{student.user.first_name} "
+                            f"{student.user.last_name}"
+                        ).strip(),
+                },
+
+                "exam": {
+                    "id":
+                        exam.id,
+
+                    "name":
+                        exam.name,
+                },
+
+                "subjects":
+                    subjects,
+
+                "summary": {
+                    "total_subjects":
+                        total_subjects,
+
+                    "total_marks":
+                        round(
+                            total_marks_obtained,
+                            2,
+                        ),
+
+                    "total_possible_marks":
+                        total_possible_marks,
+
+                    "average_marks":
+                        round(
+                            average_marks,
+                            2,
+                        ),
+
+                    "gpa":
+                        round(
+                            gpa,
+                            2,
+                        ),
+                },
             }
         )

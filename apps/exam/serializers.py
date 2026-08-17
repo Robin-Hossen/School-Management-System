@@ -46,23 +46,61 @@ class ExamSubjectSerializer(serializers.ModelSerializer):
         read_only=True
     )
 
+    exam_type = serializers.CharField(
+        source="exam.exam_type",
+        read_only=True
+    )
+
+    academic_session_name = serializers.CharField(
+        source="exam.academic_session.name",
+        read_only=True
+    )
+
     subject_name = serializers.CharField(
         source="subject.name",
         read_only=True
     )
 
+    class_name = serializers.CharField(
+        source="teaching_assignment.class_name.name",
+        read_only=True
+    )
+
+    section_name = serializers.CharField(
+        source="teaching_assignment.section.name",
+        read_only=True
+    )
+
     class Meta:
         model = ExamSubject
-        fields = "__all__"
 
-    def to_representation(self, instance):
+        fields = [
+            "id",
 
-        data = super().to_representation(instance)
+            "exam",
+            "exam_name",
+            "exam_type",
+            "academic_session_name",
 
-        data["exam_name"] = instance.exam.name
-        data["subject_name"] = instance.subject.name
+            "subject",
+            "subject_name",
 
-        return data
+            "teaching_assignment",
+
+            "class_name",
+            "section_name",
+
+            "exam_date",
+            "start_time",
+            "end_time",
+            "total_marks",
+
+            "created_at",
+            "updated_at",
+        ]
+
+
+
 
 
 class ResultSerializer(serializers.ModelSerializer):
@@ -149,3 +187,25 @@ class ResultSerializer(serializers.ModelSerializer):
             f"{user.first_name} "
             f"{user.last_name}"
         ).strip()
+# =========================================================
+# Result Entry Serializers
+# =========================================================
+class ResultEntryItemSerializer(serializers.Serializer):
+    student = serializers.IntegerField()
+    marks_obtained = serializers.DecimalField(
+        max_digits=5,
+        decimal_places=2
+    )
+    remarks = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        default=""
+    )
+
+
+class EnterResultsSerializer(serializers.Serializer):
+    exam_subject = serializers.IntegerField()
+
+    results = ResultEntryItemSerializer(
+        many=True
+    )        

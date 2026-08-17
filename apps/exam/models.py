@@ -46,9 +46,7 @@ class ExamSubject(models.Model):
     )
 
     exam_date = models.DateField()
-
     start_time = models.TimeField()
-
     end_time = models.TimeField()
 
     total_marks = models.PositiveIntegerField(
@@ -64,44 +62,17 @@ class ExamSubject(models.Model):
     )
 
     class Meta:
-
-        constraints = [
-            models.UniqueConstraint(
-                fields=[
-                    "exam",
-                    "subject"
-                ],
-                name="unique_exam_subject"
-            )
-        ]
-    
-    exam = models.ForeignKey(
-        Exam,
-        on_delete=models.CASCADE,
-        related_name="exam_subjects"
-    )
-
-    subject = models.ForeignKey(
-        Subject,
-        on_delete=models.CASCADE,
-        related_name="exam_subjects"
-    )
-
-    exam_date = models.DateField()
-    start_time = models.TimeField()
-    end_time = models.TimeField()
-    total_marks = models.PositiveIntegerField(default=100)
-
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    class Meta:
         constraints = [
             models.UniqueConstraint(
                 fields=["exam", "subject"],
                 name="unique_exam_subject"
             )
         ]
+
+    def __str__(self):
+        return f"{self.exam.name} - {self.subject.name}"
+
+
 
 
 class Result(models.Model):

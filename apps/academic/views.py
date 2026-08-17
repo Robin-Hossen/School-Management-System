@@ -32,8 +32,31 @@ class EnrollmentViewSet(viewsets.ModelViewSet):
     serializer_class=EnrollmentSerializer      
 
 class TeachingAssignmentViewSet(viewsets.ModelViewSet):
-    queryset=TeachingAssignment.objects.all()
-    serializer_class=TeachingAssignmentSerializer
+    serializer_class = TeachingAssignmentSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+
+        queryset = TeachingAssignment.objects.select_related(
+            "teacher__user",
+            "teacher",
+            "subject",
+            "class_name",
+            "section",
+            "academic_session",
+        )
+
+        # Teacher হলে শুধু নিজের assignment দেখাবে
+        try:
+            teacher = user.teacher
+            return queryset.filter(
+                teacher=teacher
+            )
+
+        except Exception:
+            # Admin/other user হলে সব assignment
+            return queryset
 
 
 
