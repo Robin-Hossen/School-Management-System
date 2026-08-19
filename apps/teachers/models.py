@@ -23,6 +23,12 @@ class Teacher(models.Model):
         blank=True
     )
 
+    image = models.ImageField(
+        upload_to="teachers/",
+        blank=True,
+        null=True
+    )
+
     phone_number = models.CharField(
         max_length=15,
         blank=True

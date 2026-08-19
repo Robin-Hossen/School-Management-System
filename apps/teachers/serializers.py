@@ -15,6 +15,7 @@ class TeacherSerializer(serializers.ModelSerializer):
             "teacher_id",
             "designation",
             "qualification",
+            "image",
             "phone_number",
             "joining_date",
             "address",
