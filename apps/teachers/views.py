@@ -3,6 +3,7 @@ from rest_framework import filters, viewsets
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from .permissions import TeacherPermission
 
 from .models import Teacher
 from .serializers import TeacherSerializer
@@ -11,10 +12,15 @@ from apps.academic.models import TeachingAssignment
 from apps.academic.serializers import TeachingAssignmentSerializer
 
 
+
+
+
 class TeacherViewSet(viewsets.ModelViewSet):
 
     queryset = Teacher.objects.select_related("user").all()
     serializer_class = TeacherSerializer
+
+    permission_classes = [TeacherPermission]
 
     filter_backends = [
         DjangoFilterBackend,
